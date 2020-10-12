@@ -13,6 +13,8 @@ initial_version=${INITIAL_VERSION:-0.0.0}
 tag_context=${TAG_CONTEXT:-repo}
 suffix=${PRERELEASE_SUFFIX:-beta}
 
+major_tag_only=${MAJOR_TAG_ONLY:-false}
+
 cd ${GITHUB_WORKSPACE}/${source}
 
 echo "*** CONFIGURATION ***"
@@ -25,6 +27,7 @@ echo -e "\tDRY_RUN: ${dryrun}"
 echo -e "\tINITIAL_VERSION: ${initial_version}"
 echo -e "\tTAG_CONTEXT: ${tag_context}"
 echo -e "\tPRERELEASE_SUFFIX: ${suffix}"
+echo -e "\MAJOR_TAG_ONLY: ${major_tag_only}"
 
 current_branch=$(git rev-parse --abbrev-ref HEAD)
 
@@ -44,11 +47,11 @@ git fetch --tags
 
 # get latest tag that looks like a semver (with or without v)
 case "$tag_context" in
-    *repo*) 
+    *repo*)
         tag=$(git for-each-ref --sort=-v:refname --format '%(refname)' | cut -d / -f 3- | grep -E "^v?[0-9]+.[0-9]+.[0-9]+$" | head -n1)
         pre_tag=$(git for-each-ref --sort=-v:refname --format '%(refname)' | cut -d / -f 3- | grep -E "^v?[0-9]+.[0-9]+.[0-9]+(-$suffix.[0-9]+)?$" | head -n1)
         ;;
-    *branch*) 
+    *branch*)
         tag=$(git tag --list --merged HEAD --sort=-v:refname | grep -E "^v?[0-9]+.[0-9]+.[0-9]+$" | head -n1)
         pre_tag=$(git tag --list --merged HEAD --sort=-v:refname | grep -E "^v?[0-9]+.[0-9]+.[0-9]+(-$suffix.[0-9]+)?$" | head -n1)
         ;;
@@ -83,12 +86,12 @@ case "$log" in
     *#major* ) new=$(semver -i major $tag); part="major";;
     *#minor* ) new=$(semver -i minor $tag); part="minor";;
     *#patch* ) new=$(semver -i patch $tag); part="patch";;
-    * ) 
+    * )
         if [ "$default_semvar_bump" == "none" ]; then
-            echo "Default bump was set to none. Skipping..."; exit 0 
-        else 
-            new=$(semver -i "${default_semvar_bump}" $tag); part=$default_semvar_bump 
-        fi 
+            echo "Default bump was set to none. Skipping..."; exit 0
+        else
+            new=$(semver -i "${default_semvar_bump}" $tag); part=$default_semvar_bump
+        fi
         ;;
 esac
 
@@ -107,11 +110,11 @@ echo $part
 # did we get a new tag?
 if [ ! -z "$new" ]
 then
-	# prefix with 'v'
-	if $with_v
-	then
-		new="v$new"
-	fi
+  # prefix with 'v'
+  if $with_v
+  then
+    new="v$new"
+  fi
 fi
 
 if [ ! -z $custom_tag ]
@@ -126,6 +129,13 @@ else
     echo -e "Bumping tag ${tag}. \n\tNew tag ${new}"
 fi
 
+# override to use major only
+if $major_tag_only
+then
+  new=$(echo $new | grep -o -E 'v[0-9]+')
+  tag=$(echo $tag | grep -o -E 'v[0-9]+')
+fi
+
 # set outputs
 echo ::set-output name=new_tag::$new
 echo ::set-output name=part::$part
@@ -135,7 +145,7 @@ if $dryrun
 then
     echo ::set-output name=tag::$tag
     exit 0
-fi 
+fi
 
 echo ::set-output name=tag::$new
 
